@@ -66,6 +66,35 @@
 - [ ] ArchUnit for architecture rules
 - [ ] Spotless Maven Plugin for formatting
 
+#### PMD configuration notes
+
+**Java version compatibility**
+- PMD lags behind the Java release cycle. Set `<targetJdk>` explicitly to the latest PMD-supported LTS version (e.g. `21`) when your compiler targets a newer preview or non-LTS version. PMD will still find all the same issues; it just will not parse language-version-specific syntax it does not know yet.
+
+**Exclude debug/tooling packages from analysis**
+- Internal packages used only for development tooling (e.g. a `testapp` package with a manual test harness) tend to violate rules that are valid in production code. Exclude them via `<excludes><exclude>**/testapp/**</exclude></excludes>` so they do not pollute the report.
+
+**Rules to exclude globally** (add `<exclude name="..."/>` in the appropriate category block of your ruleset XML)
+
+| Rule | Category | Why exclude |
+|------|----------|-------------|
+| `AvoidFieldNameMatchingMethodName` | Error Prone | Fires on the record-like accessor pattern (`field foo` + method `foo()`) that many codebases use for mutable value objects. If the pattern is consistent and intentional, the warning is noise. |
+| `AvoidInstantiatingObjectsInLoops` | Performance | Unavoidable in factory and builder code that constructs domain objects from configuration. Refactoring away the `new` inside the loop would either duplicate code or introduce unnecessary indirection. |
+| `AvoidLiteralsInIfCondition` | Error Prone | Domain-specific algorithms often use small numeric literals (minimum counts, thresholds, distances) that have no meaningful name outside their immediate context. Forcing named constants adds ceremony without clarity. |
+| `AvoidBranchingStatementAsLastInLoop` | Error Prone | The "return the first match" loop pattern (`for { … return found; }`) is idiomatic Java for search helpers. PMD flags the `return` as a branching statement at the end of the loop body, but the intent is clear and the alternative (a local variable + break) is noisier. |
+| `OneDeclarationPerLine` | Best Practices | Compact multi-variable declarations (`int i = 0, j = 0`) are common for tightly related loop counters and parallel accumulators. The rule is a style preference; enforce it through Checkstyle or Spotless if you want it. |
+| `UseVarargs` | Best Practices | When a method genuinely accepts a fixed-shape array (not a variadic call site), changing the signature to varargs changes the calling contract and can introduce ambiguity. Suppress or exclude when arrays are passed intentionally. |
+
+**Rules to suppress per site** (use `@SuppressWarnings("PMD.<RuleName>")` on the smallest enclosing element)
+
+| Rule | When to suppress |
+|------|-----------------|
+| `LooseCoupling` | When the concrete collection type carries a meaningful contract (e.g. `ConcurrentHashMap` guarantees thread safety; switching the declared type to `Map` would hide that guarantee and allow accidental substitution with a non-thread-safe implementation). |
+| `ReturnEmptyCollectionRatherThanNull` | When `null` and an empty collection have distinct semantics — e.g. `null` means "this field does not apply" and an empty collection means "the field applies but has no entries". Returning empty in that case would silently change the API contract. |
+| `NullAssignment` | When `null` is used as a local sentinel in a compact chain of if-else branches and the scope is narrow enough that an `Optional` wrapper would add more ceremony than clarity. |
+| `CompareObjectsWithEquals` | When object identity (`!=`) is intentionally compared — e.g. checking whether a mutation algorithm produced a new object rather than returned the original. Value equality would not detect that distinction. |
+| `SystemPrintln` | In standalone training, benchmarking, or development utilities whose primary output channel is stdout by design. Replace with a logger in application code. |
+
 ### Coverage
 - [ ] JaCoCo with `<minimum>0.90</minimum>` for line and branch coverage
 
