@@ -186,7 +186,7 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 - [ ] Java compiler warnings (`-Werror`)
 - [ ] Static analysis violations (Checkstyle, SpotBugs, PMD)
 - [ ] Architectural violations (ArchUnit)
-- [ ] Vulnerable dependencies (`npm audit`, OWASP Dependency-Check) — **make the OWASP job non-blocking** (`continue-on-error: true`) when CVEs exist for which no patched version is yet available. Keep the job running so findings remain visible, but do not let library-vendor lag block your own PRs. Supply an NVD API key via `${env.NVD_API_KEY}` (free at nvd.nist.gov/developers/request-an-api-key); without it the NVD database update takes 20–30 minutes per run.
+- [ ] Vulnerable dependencies (`npm audit`, OWASP Dependency-Check) — **do not run OWASP on pull requests**. Move it to a dedicated `security.yml` workflow that triggers on push to `main` and on a weekly schedule (e.g. every Monday at 06:00 UTC: `cron: '0 6 * * 1'`). Running it on PRs causes a red cross whenever a CVE exists for which no patched version is yet available, blocking unrelated work. The weekly run keeps findings visible without polluting the PR pipeline. Supply an NVD API key via `${env.NVD_API_KEY}` (free at nvd.nist.gov/developers/request-an-api-key); without it the NVD database update takes 20–30 minutes per run.
 - [ ] Generated-code diffs (re-run generator in CI and fail if output differs from committed files)
 
 ### Quality gates
