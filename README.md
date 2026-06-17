@@ -7,6 +7,7 @@
 ### Strict compilation
 - [ ] `"strict": true` in `tsconfig.json`
 - [ ] `"noUnusedLocals": true` and `"noUnusedParameters": true` in `tsconfig.json`
+- [ ] Consider `"noUncheckedIndexedAccess": true` — high-value, but expect churn in array-heavy code
 - [ ] `"strictTemplates": true` and `"extendedDiagnostics": { "defaultCategory": "error" }` in `angularCompilerOptions`
 - [ ] Use standalone components
 - [ ] Avoid `any`; use `unknown` if the type is genuinely unknown
@@ -26,6 +27,7 @@
   - `@typescript-eslint/no-deprecated: 'error'`
   - `eqeqeq`
 - [ ] Enforce barrel imports for generated code via `no-restricted-imports`
+- [ ] Add `eslint-plugin-sonarjs` and extend `sonarjs.configs.recommended` (enables `cognitive-complexity`; the TS analog to PMD's design rules). In flat config it self-registers — don't also add `plugins: { sonarjs }`.
 
 ### Formatting
 - [ ] Add Prettier + `.prettierrc`
