@@ -28,6 +28,14 @@
   - `eqeqeq`
 - [ ] Enforce barrel imports for generated code via `no-restricted-imports`
 - [ ] Add `eslint-plugin-sonarjs` and extend `sonarjs.configs.recommended` (enables `cognitive-complexity`; the TS analog to PMD's design rules). In flat config it self-registers — don't also add `plugins: { sonarjs }`.
+- [ ] God-object / size caps — stop a class growing one harmless method at a time. `cognitive-complexity` only guards individual *methods*; these guard the file/function/class as a whole:
+  - `max-lines: ['error', { max: 400, skipBlankLines: true, skipComments: true }]`
+  - `max-lines-per-function: ['error', { max: 80, skipBlankLines: true, skipComments: true }]`
+  - `max-classes-per-file: ['error', 1]`
+  - Exempt specs (legitimately long: fixtures, provider setup) with a `files: ['**/*.spec.ts']` override turning the size caps off.
+  - **Adopt as a ratchet, not a big-bang.** Files that already exceed the cap get a per-file override pinned at their *current* counted size (run lint once to read the reported number — it differs from `wc -l` because of `skipBlankLines`/`skipComments`). That's a frozen ceiling: they can only shrink, never grow. Add a `TODO` to lower the number as the file is slimmed, and delete the override once it drops under the global cap. Pinning keeps CI green while making the debt explicit and non-growing; a hard global cap on a brownfield repo just leaves the build red and blocks unrelated work.
+  - Note the weakness: line-counting can't tell a god object from a long enum/data file (`photo.ts` of pure interfaces is fine at 400+). The layer-boundary rule below is the structural complement.
+- [ ] Architectural layer boundaries — `eslint-plugin-boundaries`, the TS analog to ArchUnit (see the Java section). Attacks the *cause* of god objects rather than the symptom: a UI component that can `inject()` a store/repository directly will accrete data-layer logic until it's a god object. Tag folders as layers (`component` / `service` / `store` / `domain`) in `settings['boundaries/elements']`, then `boundaries/element-types` with `default: 'disallow'` and allow only the legal edges — crucially **forbid `component → store`**, forcing that logic into a service. Adopt as `'warn'` first (the first run is the real coupling map of the app), triage, then promote to `'error'`. Put a `domain` pattern above the broad `component` catch-all so pure utils/types aren't misclassified and wrongly denied store access.
 
 ### Formatting
 - [ ] Add Prettier + `.prettierrc`
@@ -151,6 +159,9 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 - Many Maven plugins lag behind the JDK release cycle. When targeting a non-LTS JDK (e.g. JDK 25), add explicit `<version>` overrides in the pom for JaCoCo, SpotBugs, PMD, ArchUnit, and Error Prone even if the Spring Boot BOM already manages them — the BOM version may be too old to support the new class-file version.
 - Spring Boot 3.3.x bundles ASM 9.6, which cannot parse class files compiled by JDK 25. Upgrade to Spring Boot 3.4.x or later (ASM 9.8+) before running `@WebMvcTest` or any test that loads the Spring context on JDK 25.
 
+### Context-load smoke test
+- [ ] Add a `@SpringBootTest(webEnvironment = NONE)` test that loads the full context and asserts a bean wires (e.g. `context.getBean(X.class)`). Unit tests construct beans by hand and ArchUnit is static, so neither exercises real DI — without this, broken wiring (e.g. a `@Component` with two constructors and no `@Autowired`, or a missing bean) only fails when the app actually starts, not in the build. Use `webEnvironment = NONE` so it doesn't bind a port, and inject the context as a test-method parameter to avoid a NullAway-flagged `@Autowired` field.
+
 ### Coverage
 - [ ] JaCoCo with `<minimum>0.90</minimum>` for line and branch coverage
 
@@ -187,7 +198,7 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 - [ ] Coverage below threshold
 - [ ] Java compiler warnings (`-Werror`)
 - [ ] Static analysis violations (Checkstyle, SpotBugs, PMD)
-- [ ] Architectural violations (ArchUnit)
+- [ ] Architectural violations (ArchUnit for Java; `eslint-plugin-boundaries` for Angular/TS)
 - [ ] Vulnerable dependencies (`npm audit`, OWASP Dependency-Check) — **do not run OWASP on pull requests**. Move it to a dedicated `security.yml` workflow that triggers on push to `main` and on a weekly schedule (e.g. every Monday at 06:00 UTC: `cron: '0 6 * * 1'`). Running it on PRs causes a red cross whenever a CVE exists for which no patched version is yet available, blocking unrelated work. The weekly run keeps findings visible without polluting the PR pipeline. Supply an NVD API key via `${env.NVD_API_KEY}` (free at nvd.nist.gov/developers/request-an-api-key); without it the NVD database update takes 20–30 minutes per run.
 - [ ] Generated-code diffs (re-run generator in CI and fail if output differs from committed files)
 
