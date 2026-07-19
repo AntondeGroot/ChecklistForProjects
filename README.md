@@ -7,7 +7,9 @@
 ### Strict compilation
 - [ ] `"strict": true` in `tsconfig.json`
 - [ ] `"noUnusedLocals": true` and `"noUnusedParameters": true` in `tsconfig.json`
-- [ ] Consider `"noUncheckedIndexedAccess": true` — high-value, but expect churn in array-heavy code
+- [ ] Consider `"noUncheckedIndexedAccess": true` — high-value, but expect churn in array-heavy code. Two Angular-specific traps:
+  - **`tsc --noEmit` does NOT catch template index-access** — only `ng build` (strictTemplates) compiles templates. Measure and fix via a build, not a type-check, or you'll miss half the violations (`state.map[key].x`, `row.cells[0].color`, etc. in `.html`).
+  - **You can't scope it off for specs.** The unit-test builder compiles the production components' *templates* under `tsconfig.spec.json`, so turning the flag off there makes your template guards (`?? 0`, `?.x`) fire `NG8102` ("unnecessary nullish coalescing"). It's all-or-nothing across app + specs — budget for `!`-asserting fixture access in tests too (they index controlled data, so `!` is idiomatic there). Actual churn is often far smaller than feared.
 - [ ] `"strictTemplates": true` and `"extendedDiagnostics": { "defaultCategory": "error" }` in `angularCompilerOptions`
 - [ ] Use standalone components
 - [ ] Avoid `any`; use `unknown` if the type is genuinely unknown
@@ -27,7 +29,12 @@
   - `@typescript-eslint/no-deprecated: 'error'`
   - `eqeqeq`
 - [ ] Enforce barrel imports for generated code via `no-restricted-imports`
-- [ ] Add `eslint-plugin-sonarjs` and extend `sonarjs.configs.recommended` (enables `cognitive-complexity`; the TS analog to PMD's design rules). In flat config it self-registers — don't also add `plugins: { sonarjs }`.
+- [ ] Add `eslint-plugin-sonarjs` and extend `sonarjs.configs.recommended` (enables `cognitive-complexity`; the TS analog to PMD's design rules). In flat config it self-registers — don't also add `plugins: { sonarjs }`. The recommended set has **no autofixers** for most rules (`--fix` does nothing), so the first run is all manual triage. Like PMD, some recommended rules are noise and want a decision (the sonarjs analog of the PMD exclusion table):
+  - `sonarjs/todo-tag` — **turn off.** It errors on every `TODO`, which directly fights the ratchet philosophy used throughout this checklist (pinned-debt overrides and boundary exemptions all point at a `TODO`). This one bites the moment you add your first ratchet marker.
+  - `sonarjs/pseudo-random` — off when there's no security-sensitive randomness (game dice, animation jitter). It's a crypto rule.
+  - `sonarjs/cognitive-complexity` — ratchet it per-file like the size caps (`['error', <current>]` with a `TODO`) rather than refactoring a big untested method up front.
+  - Per-site suppress (keep the rule on) for legitimate cases: `no-angular-bypass-sanitization` (rendering your own static i18n HTML), `post-message` (an embed handshake to a host whose origin is unknown until it replies), `super-linear-regex` (a regex over trusted, small input like your own CSS in a test), `function-return-type` (a helper that legitimately returns a union — e.g. a value coerced to its declared type).
+  - `sonarjs/prefer-specific-assertions` — high-value but noisy in specs (`expect(x.length).toBe(n)` → `expect(x).toHaveLength(n)`); fix them (a `perl -pe` sweep works) rather than disabling — better failure messages.
 - [ ] God-object / size caps — stop a class growing one harmless method at a time. `cognitive-complexity` only guards individual *methods*; these guard the file/function/class as a whole:
   - `max-lines: ['error', { max: 400, skipBlankLines: true, skipComments: true }]`
   - `max-lines-per-function: ['error', { max: 80, skipBlankLines: true, skipComments: true }]`
@@ -43,6 +50,7 @@
   - **Type-only imports get flagged too,** and they're most of the first-run list: shared *types* co-located with a component or store (a `Tag` in the DB-schema file, a view-model interface in a component, persisted/API contract types like `FrameSignature`/`PhotoAsset`). Best fix is **relocate the type to `domain`**. If there are too many to relocate up front, a pragmatic shippable compromise is to allow `domain → store/service` (domain may reference contract types that still live there) while keeping `component → store` forbidden — the load-bearing rule — with a TODO to relocate and tighten later.
   - **Except dev-only/tooling screens and test fixtures** via `ignores` (e.g. a `?debug` diagnostic panel that legitimately reaches into stores, `*.fixture.ts`) rather than contorting the rules around them.
   - **Sanity-check before trusting it — non-negotiable:** inject an import you *know* crosses a layer (a component that imports a store), confirm the rule errors, then revert. A green gate means nothing until you've watched it go red. If a known violation doesn't fire, classification/resolution is broken — don't conclude the codebase is clean. If the plugin keeps fighting you, the triage's *value* (the bucketed findings) is also obtainable with a direct `grep` for cross-layer imports while you sort the gate out separately.
+  - **For an OpenAPI-generated client, split the generated code into two layers**: `generated-api` (the injectable `*Service` classes — the repository/store analog) and `generated-model` (the DTO *types*). Components import DTO types *everywhere* and legitimately so, so a single `generated` element with `component → generated` forbidden flags every type import and is unusable. The load-bearing rule is **`component → generated-api` forbidden, `component → generated-model` allowed** — data access goes through an app service, types are free. Order the `generated-api` pattern before the `generated-model` catch-all (first match wins). Ratchet existing `component → generated-api` sites with an inline `// eslint-disable-next-line boundaries/dependencies` + `TODO` (which is why `sonarjs/todo-tag` must be off).
 
 ### Formatting
 - [ ] Add Prettier + `.prettierrc`
@@ -53,8 +61,12 @@
   ```
   branches: 90%, functions: 90%, lines: 90%, statements: 90%
   ```
+  - Angular's `@angular/build:unit-test` builder takes coverage options **natively in `angular.json`** (`coverage`, `coverageThresholds`, `coverageExclude`, `coverageReporters`) — no separate vitest config needed. Leave `coverage` off by default (fast local `ng test`) and pass `--coverage` only in CI. Exclude generated code, `main.ts`, `environments/`, and `**/*.spec.ts`, or the numbers are noise.
+  - **Ratchet coverage too.** If the repo isn't at 90% yet, a hard 0.90 gate turns CI red on merge. Measure current, set the threshold just below it with a `TODO` to climb — a frozen floor that can only rise. (Same for JaCoCo `<minimum>` on the Java side.)
 - [ ] Mock `HTMLMediaElement.play()` in `src/test-setup.ts` to silence jsdom "Not implemented" errors
 - [ ] Register it in `angular.json` under `test.options.setupFiles`
+- [ ] **`import.meta.url` resolves elsewhere under V8 coverage instrumentation.** A test that reads a source/CSS file via `dirname(fileURLToPath(import.meta.url))` passes normally but fails *only when `--coverage` is on* (the module URL points at an instrumented location, so relative reads break). Anchor to the project root instead — `join(process.cwd(), 'src/app')` — which is stable in both modes. This surfaces the first time you wire coverage into CI.
+- [ ] **Don't depend on `requestAnimationFrame` timing in unit tests.** rAF-driven animation code can stall under load — e.g. a Husky `pre-push` running build + test together — and never resolve, giving intermittent 5 s timeouts that pass in isolation. Make zero-duration animations short-circuit (jump straight to the end, skip rAF); that's both correct behaviour and deterministic tests.
 
 ### i18n
 - [ ] Cache-bust translation JSON files: append `?v=${Date.now()}` in `HttpLoaderFactory.getTranslation()`
@@ -147,6 +159,12 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 
 #### ArchUnit
 - When constructing `ClassFileImporter`, always add `.withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)`. Without it, test classes that live in the same package as production classes (e.g. `controller`) will appear as production-code dependencies and cause false cross-package violation failures.
+- Also exclude generated code and any dev-only tooling package via a custom `ImportOption` (`location -> !location.contains("/generated/") && !location.contains("/testapp/")`), so the rules describe only hand-written code — same rationale as excluding them from PMD/JaCoCo.
+- **Sanity-check with a real bytecode dependency, not an unused `import`.** ArchUnit reads bytecode, where an unused import leaves no trace — inject an actual *usage* (a field or parameter of the forbidden type), confirm the rule goes red, then revert. (A bonus signal: a genuine cross-layer usage often trips *two* rules — the direct one and a new cycle — which confirms both fire.)
+- **Adopt a cycle rule (`slices()...should().beFreeOfCycles()`) on an existing codebase with `FreezingArchRule`** — the ArchUnit-native ratchet. `FreezingArchRule.freeze(rule)` baselines the current violations to a store and fails only on *new* ones; the default matcher ignores line numbers, so it's robust to code shifts. It's the right tool because untangling long-standing package cycles (e.g. `game ↔ state` via a marker interface referenced downward) is a real refactoring project, not a gate you can flip green in one pass. Mechanics:
+  - `src/test/resources/archunit.properties`: `freeze.store.default.allowStoreCreation=true` for the **first** run (creates the baseline), then flip it to **`false`** so a missing store fails loudly instead of silently re-baselining and accepting whatever exists.
+  - **Commit the `archunit_store/` directory — do NOT gitignore it.** It *is* the baseline. Gitignoring it plus `allowStoreCreation=true` means CI recreates a fresh baseline every run and the guard checks nothing (the same vacuous-green failure mode as the boundaries resolver).
+- **Checkstyle `ConstantName` collides with ArchUnit's field-naming convention.** `@ArchTest` rules are `static final` fields named in camelCase so each reads as a sentence (and reports as a readable test name); `ConstantName` demands `UPPER_SNAKE`. Suppress `ConstantName` for the arch-test class rather than uglifying the rule names.
 
 #### JaCoCo coverage
 - Exclude the `@SpringBootApplication` bootstrap class and `@Configuration`/`@ConfigurationProperties` classes from coverage enforcement. They contain only Spring lifecycle glue that cannot be meaningfully unit-tested. Use the `<excludes>` block in the JaCoCo check execution:
@@ -169,7 +187,8 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 - Spring Boot 3.3.x bundles ASM 9.6, which cannot parse class files compiled by JDK 25. Upgrade to Spring Boot 3.4.x or later (ASM 9.8+) before running `@WebMvcTest` or any test that loads the Spring context on JDK 25.
 
 ### Context-load smoke test
-- [ ] Add a `@SpringBootTest(webEnvironment = NONE)` test that loads the full context and asserts a bean wires (e.g. `context.getBean(X.class)`). Unit tests construct beans by hand and ArchUnit is static, so neither exercises real DI — without this, broken wiring (e.g. a `@Component` with two constructors and no `@Autowired`, or a missing bean) only fails when the app actually starts, not in the build. Use `webEnvironment = NONE` so it doesn't bind a port, and inject the context as a test-method parameter to avoid a NullAway-flagged `@Autowired` field.
+- [ ] Add a `@SpringBootTest` test that loads the full context and asserts a bean wires (e.g. `context.getBean(X.class)`). Unit tests construct beans by hand and ArchUnit is static, so neither exercises real DI — without this, broken wiring (e.g. a `@Component` with two constructors and no `@Autowired`, or a missing bean) only fails when the app actually starts, not in the build. Inject the context as a test-method parameter to avoid a NullAway-flagged `@Autowired` field.
+  - **`webEnvironment = NONE` only for a non-web app.** For a web app (`@RestController`, SSE, filters) NONE strips the servlet context and those beans fail to wire, so the context won't load at all. Use the default **`MOCK`** — it loads the *full* context, web beans included, without binding a real port, which is exactly what you want. (The "don't bind a port" goal is already satisfied by MOCK; only `RANDOM_PORT`/`DEFINED_PORT` bind one.)
 
 ### Coverage
 - [ ] JaCoCo with `<minimum>0.90</minimum>` for line and branch coverage
@@ -189,6 +208,7 @@ These adjustments are needed when using Spring Boot with strict static analysis.
   - invalid schema keywords (`min`/`max` instead of `minLength`/`minimum`) — **ignored**, so no validation annotation is generated
   - a malformed inline response schema (a bare `sessionId:` directly under `schema:`, with no `type`/`$ref`) — generates an **empty model**
   - a media-type typo (`appplication/json`) — accepted as a valid *custom* media type, so the response body binds to **nothing**
+  - `nullable: true` in an **OpenAPI 3.1** spec — 3.1 removed the keyword, so it's **silently ignored** and the field generates as plain non-null. `struct` catches it; the fix is the union type `type: [string, 'null']`. **But** with openapi-generator's **Spring** generator that union produces `JsonNullable<T>`, which changes the field's Java type and breaks hand-written call sites — so for a field that's merely optional (not explicitly nullable), prefer just `type: string` and leave it out of `required` rather than the union.
 - [ ] Use **Redocly**, not Spectral, as the structural gate. Redocly's `recommended` config enables the `struct` rule, which validates schema objects against the OpenAPI meta-schema and catches the invalid-keyword and malformed-inline-schema cases above. Spectral's default `spectral:oas` ruleset does **not** catch them (unknown keywords are valid JSON-Schema annotations, so they pass; it only flagged the missing `operationId` and the unused component). They're complementary — Spectral uniquely catches `oas3-unused-component` — but if you run one structural gate, run Redocly.
 - [ ] Redocly exits non-zero only on **errors**, not warnings — so `struct`/keyword violations fail CI while style nits (missing 4xx response, license, `localhost`/example server URL) stay visible but non-blocking. Good default; don't promote warnings to errors without triage.
 - [ ] Turn off `security-defined` for APIs with **no auth by design** — its recommended severity is `error`, so it fails the build with one finding *per operation*. Important: OpenAPI security schemes are **declarative only** — they document the API and hint codegen, they do **not** enforce anything. If you add a scheme you must also add server-side enforcement (Spring Security / a filter); the spec half is the easy half.
@@ -201,6 +221,7 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 ### The gap a linter cannot close
 - [ ] A linter proves the spec is **well-formed**; it cannot prove the spec **matches the running server**. The media-type typo above slipped past *both* linters because a media-type key is free-form text. Close this with **codegen + a contract test**: generate models from the spec, compile the server against the generated interfaces, and assert real endpoint responses (status code + body shape) in an integration test. This is what actually catches "spec says X, server returns Y".
 - [ ] Treat the spec as the single source of truth — **delete hand-written DTOs that duplicate generated models** (they drift apart). Re-run the generator in CI and fail on any diff vs committed output (see the generated-code item in the CI section).
+  - **If you instead gitignore the generated code** (a valid choice — the spec is then the only source of truth and drift is impossible by construction), the `git diff --exit-code` drift gate becomes a **no-op that silently protects nothing** (a gitignored path never shows in the diff). Delete that CI step rather than leave it implying a guarantee it doesn't provide; the real gate in this model is spec-lint + regenerate-before-build. Pick one model — commit-and-diff, *or* ignore-and-regenerate — and make the CI match it.
 
 ---
 
@@ -252,3 +273,15 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 - [ ] `npm install --save-dev husky` and `npx husky init`
 - [ ] `pre-commit`: run lint and format check on the entire codebase
 - [ ] `pre-push`: run build and tests
+
+---
+
+## Refactoring & code design
+
+Applies whenever you touch existing code, not just greenfield. The three that matter most:
+
+- [ ] **Cohesion over god classes.** Group logically-related behaviour together and split large classes along *concept* boundaries — each class (and file) should be one clear responsibility. When a class accretes unrelated concerns, extract a cohesive collaborator it delegates to (e.g. a 900-line `GameState` → a `TradeManager`, `PlayerRoster`, `TileReachability`; a controller doing routing + seeding + HTML → three classes). Keep the extracted unit's interface narrow — if it needs 6+ collaborators injected, it isn't a clean seam; leave it.
+- [ ] **Single level of abstraction per method (SLAP).** Within a method keep every statement at the *same* level: it should read either as a sequence of named operations *or* as low-level detail — never a mix. If a method both orchestrates and fiddles with details, push the details into a named helper so the caller reads as a story. (A thin controller endpoint that builds HTML with a `StringBuilder` inline is the classic violation.)
+- [ ] **Intention-revealing, human-readable names.** Methods and variables name *what* they do in domain terms, so the code reads intuitively without comments. Replace magic numbers/strings with named constants (`LAST_TILE`/`SECTION_SIZE`, not bare `15`/`16`). Collapse near-duplicate blocks into one well-named helper (pass the varying part as a parameter) rather than repeating the pattern.
+
+**Do it under a safety net.** Before changing code, confirm it's covered by tests (and read the class it lives in). If coverage is thin, pin the current behaviour with characterization tests *first*, then refactor and re-run the full suite — plus mutation testing if set up — to confirm the change is genuinely behaviour-preserving. A "behaviour-preserving" refactor without that net can silently alter behaviour.
