@@ -37,6 +37,41 @@ For each test, in order:
 Never queue up "the next few" in your head and dump them once approved. Each test is its
 own round trip.
 
+## Plan all up front, write one at a time
+
+"One at a time" governs the **test code that gets written to the file** — not the thinking.
+It's efficient (and encouraged) to work out the *whole* set of tests you intend to write in
+one pass, and present it up front as a lightweight **plan**: an ordered list of test names
+plus a one-line intent for each. That's cheap in tokens, gives the user the full roadmap to
+react to, and saves you re-deriving the plan every round.
+
+What must still happen one at a time is **writing the actual test code**:
+
+- Do **not** generate all the test bodies up front and then reveal them one by one. That
+  costs the same tokens as dumping them *and* throws away the feedback loop — the point of
+  pausing is that the user's correction on test N reshapes test N+1, which is impossible if
+  N+1 is already written.
+- So: plan-all (cheap, once) → then for each item, write its code fresh → show → stop →
+  incorporate feedback → next. The code for a test is produced only when its turn comes.
+
+If the user just wants to see the plan approved and then have the tests applied in bulk,
+that's their call to make explicitly — but the default is one code round-trip per test.
+
+### Keep the per-test rounds cheap
+
+Once the plan is set, each approval is a **lightweight** step, not a fresh deliberation.
+Match the effort to the user's input:
+
+- **Plain "approve" / "next"** → respond quickly: emit the next already-planned test's code,
+  a one-line note on what it asserts, and stop. No re-planning, no re-reading the whole unit
+  — that thinking was spent up front.
+- **Feedback that changes something** (a tweaked assertion, a rejected approach, a
+  newly-surfaced edge case) → think only as much as needed to fold that correction into the
+  next test and adjust the remaining plan.
+
+So the per-round cost tracks the user's feedback, not a fixed tax per test. A long list with
+straight approvals should move fast.
+
 ## What counts as "one test"
 
 - One `it(...)` / `@Test` method covering one behaviour.
