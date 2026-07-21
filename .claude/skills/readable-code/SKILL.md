@@ -104,6 +104,35 @@ comment.
 Collapse two blocks that differ only in a value into one well-named helper, passing the
 varying part as a parameter. Repeated structure is a maintenance trap — the copies drift.
 
+### 7. Prefer modern language idioms — and heed the IDE's suggestions
+
+Use the clearest idiom the language version offers. A named accessor reads as intent; an
+index is a puzzle the reader has to solve.
+
+```java
+// ✗ Index arithmetic — the reader decodes "0" and "size()-1" into "first" and "last"
+Item head = items.get(0);
+Item tail = items.get(items.size() - 1);
+
+// ✓ The method name states the intent (Java 21+ SequencedCollection)
+Item head = items.getFirst();
+Item tail = items.getLast();
+```
+
+More generally: **when the IDE (IntelliJ, and equivalently the linter) flags a suggestion,
+inspection warning, or weak-warning, treat it as a signal worth acting on, not noise to
+scroll past.** These inspections encode exactly the modern-idiom and readability conventions
+this checklist is about — `get(0)` → `getFirst()`, `.stream().collect(toList())` →
+`.toList()`, verbose loops → enhanced-for/streams, `Optional` misuse, redundant casts,
+`StringBuilder` where `+` suffices, and so on.
+
+- Before treating a change as done, clear the IDE inspections on the lines you touched — a
+  clean editor gutter is part of the definition of done.
+- If you deliberately reject a suggestion, that's fine — but it should be a decision (and
+  ideally suppressed with a reason), not an unread underline left behind.
+- The same applies to whatever the CI static-analysis gate (PMD/SonarJS/SpotBugs) reports:
+  the IDE is the fast local echo of those gates, so fixing it in the editor keeps CI green.
+
 ## Definition of done — self-check before finishing
 
 Run this over your diff before calling a change complete:
@@ -115,6 +144,7 @@ Run this over your diff before calling a change complete:
 - [ ] Each touched file is one responsibility and ≤300 lines (or ratcheted with a `TODO`).
 - [ ] Names are intention-revealing in domain terms; no `tmp`, `data2`, `doStuff`.
 - [ ] No near-duplicate blocks left behind.
+- [ ] Modern idioms used (`getFirst()`/`getLast()` over `get(0)`/`get(size()-1)`, `.toList()`, etc.); IDE inspection warnings on touched lines are cleared or deliberately suppressed with a reason.
 
 ## Refactor under a safety net
 
