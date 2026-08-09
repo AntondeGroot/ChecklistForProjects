@@ -133,6 +133,26 @@ this checklist is about — `get(0)` → `getFirst()`, `.stream().collect(toList
 - The same applies to whatever the CI static-analysis gate (PMD/SonarJS/SpotBugs) reports:
   the IDE is the fast local echo of those gates, so fixing it in the editor keeps CI green.
 
+### 8. Import types; don't inline fully-qualified names
+
+Refer to a type by its short name and put the package in an `import`. A fully-qualified name
+spliced into a declaration or signature is line noise the reader has to mentally strip to see
+the actual shape.
+
+```java
+// ✗ Fully-qualified inline — the package prefix drowns the intent
+private final java.util.function.Consumer<Order> onPlaced;
+void register(java.util.function.Consumer<Order> handler) { ... }
+
+// ✓ Import java.util.function.Consumer once; the code reads as the domain
+private final Consumer<Order> onPlaced;
+void register(Consumer<Order> handler) { ... }
+```
+
+The rare exception is a genuine name clash (e.g. two `Date` types in one file) where one must
+stay qualified to disambiguate — that's a deliberate choice, not the default. This too is an
+IDE inspection (rule 7); let the editor add the import for you.
+
 ## Definition of done — self-check before finishing
 
 Run this over your diff before calling a change complete:
@@ -145,6 +165,7 @@ Run this over your diff before calling a change complete:
 - [ ] Names are intention-revealing in domain terms; no `tmp`, `data2`, `doStuff`.
 - [ ] No near-duplicate blocks left behind.
 - [ ] Modern idioms used (`getFirst()`/`getLast()` over `get(0)`/`get(size()-1)`, `.toList()`, etc.); IDE inspection warnings on touched lines are cleared or deliberately suppressed with a reason.
+- [ ] Types referred to by short name with an `import` — no fully-qualified names inline (except a deliberate clash-disambiguation).
 
 ## Refactor under a safety net
 
