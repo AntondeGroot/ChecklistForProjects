@@ -1,5 +1,10 @@
 # ChecklistForProjects
 
+- **[Android apps (Capacitor / web-in-a-webview)](ANDROID.md)** — its own list, because the phone
+  failures are a different kind: local time and the midnight rollover, local vs push notifications,
+  the JDK and `cap sync` traps, scoped storage, and the webview's own UX gotchas. Kept separate
+  since none of it applies until you ship to a device.
+
 ---
 
 ## Angular / TypeScript
