@@ -80,6 +80,38 @@ it is an architecture decision wearing a feature's clothes.
 
 ### Local notifications
 
+- [ ] **Check the plugin is actually linked into the native project — not merely in
+      `package.json`.** This is the first thing to verify, because every symptom below points
+      somewhere else. `npx cap sync` must report `Found N Capacitor plugins`, and
+      `android/capacitor.settings.gradle` must `include` the plugin with a matching
+      `implementation project(...)` in `android/app/capacitor.build.gradle`. Those files are
+      generated: if the package is not in `node_modules` at sync time, they come out **empty and
+      valid**, and everything builds and runs with no error anywhere.
+
+      It fails silently in a way that misdirects you. The plugin's own `AndroidManifest.xml` is
+      what merges `POST_NOTIFICATIONS` into your app, so without it the OS **never prompts** — and
+      because the app declares no notification permission, turning notifications on by hand in
+      system settings changes nothing either. Meanwhile JS that reads the bridge
+      (`Capacitor.Plugins.LocalNotifications`) gets `undefined` and a sensible fallback no-ops. No
+      crash, no log, no prompt: it simply looks like notifications "don't work on Android".
+
+      Put Capacitor plugins in **`dependencies`, not `devDependencies`** — they ship inside the APK.
+      In `devDependencies` any `npm install --omit=dev` produces a working build with the feature
+      quietly missing.
+
+      The definitive check is the *merged* manifest, after a build:
+
+      ```sh
+      grep POST_NOTIFICATIONS \
+        android/app/build/intermediates/merged_manifest/debug/*/AndroidManifest.xml
+      ```
+
+- [ ] **A plugin is a native change, so it needs a reinstall, not a redeploy.** If your
+      `capacitor.config.ts` sets `server.url` to a hosted site, the APK renders that site and
+      *frontend* changes reach the phone by deploying. Adding or updating a plugin does not — that
+      lives in the APK. Getting this backwards means deploying repeatedly and concluding the code
+      is broken.
+
 - [ ] **Android 13+ (API 33) needs the runtime `POST_NOTIFICATIONS` permission.** Without it,
       scheduling *succeeds* and nothing ever appears. Request it, and handle refusal.
 - [ ] **Scheduling is fire-and-forget.** A reminder that cannot be set — permission declined,
