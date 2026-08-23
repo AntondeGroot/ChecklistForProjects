@@ -107,7 +107,25 @@
 - [ ] PMD
 - [ ] Error Prone
 - [ ] NullAway
-- [ ] ArchUnit for architecture rules
+- [ ] ArchUnit for architecture rules — one `ArchitectureTest` class, but **tick the rules individually**; a
+      layering-only rule set reads like full coverage while saying nothing about cycles (see
+      [ArchUnit](#archunit) for the caveats behind each):
+  - [ ] **Package cycles** — `slices().matching("com.example.(*)..").should().beFreeOfCycles()`. The one
+        most often absent: direction rules (`noClasses()...should().dependOnClassesThat()`) only constrain the
+        pairs you thought to name, so two _sibling_ feature packages calling each other pass every one of them
+        and still deadlock the design. On an existing codebase wrap it in `FreezingArchRule`.
+  - [ ] **No dependency back onto the application root** — the companion rule to the cycle rule, because
+        `slices()` cannot see root-level classes at all.
+  - [ ] **Layer direction** — domain/logic/util must not depend on the web layer (nor on persistence, if
+        that split exists).
+  - [ ] **A leaf package that depends on nothing** — usually `util`; without this it silently becomes a
+        second god package.
+  - [ ] **Annotation placement** — `@RestController`/`@Service` classes reside in the web package and
+        nowhere else, so the layer rules cannot be sidestepped by putting a controller in `domain`.
+  - [ ] **Naming conventions** — e.g. classes annotated `@RestController` have names ending in `Controller`.
+  - [ ] **`GeneralCodingRules`** — the free ones ArchUnit ships: `NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS`,
+        `NO_CLASSES_SHOULD_THROW_GENERIC_EXCEPTIONS`, `NO_CLASSES_SHOULD_USE_JAVA_UTIL_LOGGING`,
+        `NO_CLASSES_SHOULD_USE_FIELD_INJECTION`.
 - [ ] Spotless Maven Plugin for formatting
 
 #### PMD configuration notes
@@ -183,9 +201,22 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 - When constructing `ClassFileImporter`, always add `.withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)`. Without it, test classes that live in the same package as production classes (e.g. `controller`) will appear as production-code dependencies and cause false cross-package violation failures.
 - Also exclude generated code and any dev-only tooling package via a custom `ImportOption` (`location -> !location.contains("/generated/") && !location.contains("/testapp/")`), so the rules describe only hand-written code — same rationale as excluding them from PMD/JaCoCo.
 - **Sanity-check with a real bytecode dependency, not an unused `import`.** ArchUnit reads bytecode, where an unused import leaves no trace — inject an actual _usage_ (a field or parameter of the forbidden type), confirm the rule goes red, then revert. (A bonus signal: a genuine cross-layer usage often trips _two_ rules — the direct one and a new cycle — which confirms both fire.)
+- **A rule set without a cycle rule looks complete and is not — check for one before you trust an existing `ArchitectureTest`.** Direction rules (`noClasses().that().resideInAnyPackage(A).should().dependOnClassesThat().resideInAPackage(B)`) each forbid _one named edge_, so a file full of them reads as thorough while the graph is free to knot itself anywhere you did not name: two sibling feature packages that call each other violate none of them. Cycles also arrive from refactorings that look like pure improvements — extracting a collaborator out of a god class, or adding a marker interface so a lower package can hand something back up — and once several exist, every later extraction has to route around them. `beFreeOfCycles()` is the only rule that constrains the _whole_ graph rather than a list of pairs; add it first, then add direction rules for the edges you specifically care about.
 - **Adopt a cycle rule (`slices()...should().beFreeOfCycles()`) on an existing codebase with `FreezingArchRule`** — the ArchUnit-native ratchet. `FreezingArchRule.freeze(rule)` baselines the current violations to a store and fails only on _new_ ones; the default matcher ignores line numbers, so it's robust to code shifts. It's the right tool because untangling long-standing package cycles (e.g. `game ↔ state` via a marker interface referenced downward) is a real refactoring project, not a gate you can flip green in one pass. Mechanics:
   - `src/test/resources/archunit.properties`: `freeze.store.default.allowStoreCreation=true` for the **first** run (creates the baseline), then flip it to **`false`** so a missing store fails loudly instead of silently re-baselining and accepting whatever exists.
   - **Commit the `archunit_store/` directory — do NOT gitignore it.** It _is_ the baseline. Gitignoring it plus `allowStoreCreation=true` means CI recreates a fresh baseline every run and the guard checks nothing (the same vacuous-green failure mode as the boundaries resolver).
+- **`slices()` cannot see the root package — a cycle through a root-level helper is reported as green.** A slice pattern needs at least one subpackage to capture, so `com.example.(*)..` matches `com.example.feature` but never matches classes sitting *directly* in `com.example`: the `@SpringBootApplication` class, servlet filters, and — the one that bites — a shared `Log`/`Constants`/`Util` helper someone dropped in the root. Those classes are excluded from the slice graph entirely. When a feature package calls that helper you have a genuine cycle (root composes features, features depend back up on root) that `beFreeOfCycles()` will never report. It needs its own rule alongside the cycle rule:
+  ```java
+  @ArchTest
+  static final ArchRule featurePackagesDoNotDependOnTheApplicationRoot =
+      noClasses()
+          .that()
+          .resideInAnyPackage("com.example.feature..", "com.example.other..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("com.example");
+  ```
+  `resideInAPackage("com.example")` matches that package **exactly** — note the missing `..`, which is the whole point; `"com.example.."` would match every class in the project and fail on the first line. The fix when it goes red is to move the shared helper *down* into a leaf package (`util`), not to loosen the rule: the root package should hold only the entry point and the framework glue that composes the features. Add the rule **before** doing that move — its failure output enumerates precisely which classes and call sites are in the way, which is the work list.
 - **Checkstyle `ConstantName` collides with ArchUnit's field-naming convention.** `@ArchTest` rules are `static final` fields named in camelCase so each reads as a sentence (and reports as a readable test name); `ConstantName` demands `UPPER_SNAKE`. Suppress `ConstantName` for the arch-test class rather than uglifying the rule names.
 
 #### JaCoCo coverage
