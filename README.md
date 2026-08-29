@@ -63,6 +63,7 @@
 
 - [ ] Add Prettier + `.prettierrc`
 - [ ] CI check: `prettier --check .`
+- [ ] **Set `"quoteProps": "consistent"`.** The default, `as-needed`, strips quotes from every key that doesn't strictly need them — so a map keyed by hyphenated strings comes out half-quoted (`up: '↑'` beside `'up-left': '↖'`), which reads as an accident in the source rather than what it is: a syntax rule about identifiers. `consistent` quotes every key in an object as soon as one of them has to be, and leaves objects that need no quotes alone. Cheap to adopt late — it only touches objects that already contain a quoted key.
 
 ### Testing
 
