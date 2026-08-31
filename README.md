@@ -59,11 +59,42 @@
   - **Sanity-check before trusting it — non-negotiable:** inject an import you _know_ crosses a layer (a component that imports a store), confirm the rule errors, then revert. A green gate means nothing until you've watched it go red. If a known violation doesn't fire, classification/resolution is broken — don't conclude the codebase is clean. If the plugin keeps fighting you, the triage's _value_ (the bucketed findings) is also obtainable with a direct `grep` for cross-layer imports while you sort the gate out separately.
   - **For an OpenAPI-generated client, split the generated code into two layers**: `generated-api` (the injectable `*Service` classes — the repository/store analog) and `generated-model` (the DTO _types_). Components import DTO types _everywhere_ and legitimately so, so a single `generated` element with `component → generated` forbidden flags every type import and is unusable. The load-bearing rule is **`component → generated-api` forbidden, `component → generated-model` allowed** — data access goes through an app service, types are free. Order the `generated-api` pattern before the `generated-model` catch-all (first match wins). Ratchet existing `component → generated-api` sites with an inline `// eslint-disable-next-line boundaries/dependencies` + `TODO` (which is why `sonarjs/todo-tag` must be off).
 
+### Stylelint
+
+ESLint does not read your stylesheets — nothing lints CSS/SCSS until you add Stylelint. Worth it for exactly the class of bug that is invisible in review and only shows up on a device (see [CSS and touch input](#css-and-touch-input)).
+
+- [ ] `npm i -D stylelint stylelint-config-standard-scss postcss-scss`, add a `lint:styles` script (`stylelint "src/**/*.scss"`), and run it in CI **and** in the pre-commit hook next to `eslint`/`prettier`. Stylelint exits non-zero on any error, so no `--max-warnings` flag is needed as long as you keep the default `error` severity.
+- [ ] **Ratchet `stylelint-config-standard-scss` in — do not switch it on in one go.** On an existing codebase the standard config lands with hundreds of violations at once (a mid-sized Angular app: ~600), which turns the new gate red on arrival and blocks unrelated work. Measure first (`npx stylelint "src/**/*.scss"` against a throwaway config that extends it), then either:
+  - run `--fix` once and review the diff — the bulk of it is mechanical (`rgba()` → `rgb()`, modern color notation, `0.6` → `60%`, empty lines before at-rules) — and disable what's left, or
+  - extend the config with the noisy rules switched `off` and a `TODO` per rule, re-enabling them one at a time.
+  - The one that is **not** auto-fixable and usually wants disabling outright: `selector-class-pattern`, which enforces kebab-case and therefore rejects every BEM `block__element--modifier` class.
+- [ ] **Stylelint has no formatting rules any more** (they were removed in v15), so it does not fight Prettier — keep Prettier as the only formatter. The standard config's `*-empty-line-before` rules are the one grey area, since Prettier does not manage blank lines; turn them off if they disagree with your house style.
+- [ ] **Stylelint 16+ is ESM.** Name the config `stylelint.config.mjs` (or use `"type": "module"`), and write any local plugin as ESM too — `import stylelint from 'stylelint'; export default stylelint.createPlugin(...)`. A CommonJS plugin will not load.
+- [ ] Set `customSyntax: 'postcss-scss'` when linting `.scss`. `stylelint-config-standard-scss` already does this; a bare config (one custom rule, nothing extended) must set it itself, or every `//` comment and nested rule is a parse error.
+- [ ] **A project-specific rule is ~40 lines as a local plugin,** and that is the right tool when no built-in rule can see the context you care about. `selector-disallowed-list` matches selector text only — it cannot tell a guarded rule from an unguarded one, so anything about _where_ a selector sits (inside which `@media`, under which parent) needs `root.walkRules` plus a walk up `node.parent`. Give it a real message explaining the failure, and sanity-check it against a throwaway stylesheet with both a violating and a passing case before trusting it.
+
 ### Formatting
 
 - [ ] Add Prettier + `.prettierrc`
 - [ ] CI check: `prettier --check .`
 - [ ] **Set `"quoteProps": "consistent"`.** The default, `as-needed`, strips quotes from every key that doesn't strictly need them — so a map keyed by hyphenated strings comes out half-quoted (`up: '↑'` beside `'up-left': '↖'`), which reads as an accident in the source rather than what it is: a syntax rule about identifiers. `consistent` quotes every key in an object as soon as one of them has to be, and leaves objects that need no quotes alone. Cheap to adopt late — it only touches objects that already contain a quoted key.
+
+### CSS and touch input
+
+- [ ] **Scope every `:hover` effect to `@media (hover: hover) and (pointer: fine)`.** A touch device has no pointer that can *leave* an element, so after a tap the browser keeps `:hover` applied to whatever was tapped until you tap something else — "sticky hover". A hover style that only tints or brightens is a cosmetic annoyance; one that **moves** the element (`transform: translateY(...)`, `scale(...)`) reads as *state*, and users report it as a bug: tap a card/row/tile to select it, tap again to deselect, and it stays half-lifted because the hover transform is still applying. Wrapping the rule costs nothing on desktop and removes the artefact entirely on touch:
+  ```scss
+  // Hover lift — pointer devices only; on touch a tap would leave the element parked up here.
+  @media (hover: hover) and (pointer: fine) {
+    .card:hover {
+      transform: translateY(-8px);
+    }
+  }
+  ```
+  - **Worst on anything that also has a `.selected`/`.active` class.** The leftover hover transform is a second, weaker version of the selected look, so the element never returns to its resting position and the UI shows a selection that isn't real. If a component has both a hover style and a selected style, it needs the guard.
+  - **Audit the whole stylesheet, not just the obvious control** — `grep -rn ":hover" src`. The same stickiness hits ancestors (a toolbar that tints when a button inside it is tapped), and pseudo-element hovers such as `::-webkit-slider-thumb`, which stays enlarged after a drag.
+  - **Leave `:active` alone.** It clears on `touchend` and is the correct press feedback on mobile; only `:hover` is sticky.
+  - Hybrid devices (a touchscreen laptop with a mouse) report `hover: hover` + `pointer: fine` for their primary pointer, so they keep the full desktop treatment. Use `any-hover`/`any-pointer` only if you deliberately want a hover style on a device that *also* has a coarse pointer.
+  - **Gate it so it can't creep back in.** No built-in Stylelint rule can express this — `selector-disallowed-list` sees the selector text but not the `@media` it sits in — so it takes a small local plugin: walk every rule whose selector contains `:hover`, walk up `node.parent`, and report unless an ancestor `@media` matches `/\bhover\s*:\s*hover\b/`. See [Stylelint](#stylelint).
 
 ### Testing
 
