@@ -99,6 +99,10 @@ behaviour first, one characterization test at a time, before touching the produc
 Confirm the suite is green on the unchanged code, then refactor, then re-run. A
 "behaviour-preserving" refactor without that net can silently change behaviour.
 
+Characterization tests record what the code *actually does*, warts included — including
+behaviour you think is wrong. Pin the wart, refactor under it, then change the wart
+deliberately in a separate commit. For the refactoring itself, see **`refactoring`**.
+
 ## Coverage as a ratchet, not a cliff
 
 If the repo isn't at its coverage target yet, don't let a hard gate turn CI red — measure
@@ -107,4 +111,5 @@ current, set the floor just below it with a `TODO` to climb. See `ratchet-qualit
 ## Related skills
 
 - The code being tested should meet the readability bar → **`readable-code`**.
+- Restructuring the code once the net is in place → **`refactoring`**.
 - Wiring up or tightening the coverage/mutation gate itself → **`ratchet-quality-gates`**.

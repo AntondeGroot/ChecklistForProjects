@@ -3,9 +3,9 @@ name: developer
 description: >-
   Use for any software-engineering task — writing a feature, fixing a bug, refactoring,
   reviewing, or setting up a project's quality gates, in any language (TypeScript, Java,
-  etc.). This is the umbrella skill: it sets the engineering stance (readability, test
-  discipline, ratcheted gates, spec-first APIs, strict CI) and routes to the specialized
-  skills for the details. Invoke it at the start of coding work and let it pull in the
+  etc.). This is the umbrella skill: it sets the engineering stance (readability, safe
+  refactoring, test discipline, ratcheted gates, spec-first APIs, strict CI) and routes to
+  the specialized skills for the details. Invoke it at the start of coding work and let it pull in the
   others as the task calls for them.
 ---
 
@@ -31,10 +31,12 @@ areas below, load that skill and follow it.
 
 | When you are…​ | Load skill |
 | --- | --- |
-| Writing or refactoring any code (SLAP, cognitive complexity, ≤300-line files, cohesion, names) | **`readable-code`** |
+| Writing or changing any code (SLAP, cognitive complexity, ≤300-line files, cohesion, names) | **`readable-code`** |
+| Restructuring existing code without changing behaviour (extract, split a god class, kill duplication, introduce a seam) | **`refactoring`** |
 | Writing, adding, or generating tests | **`incremental-tests`** — show **one test at a time** so it's actually read |
 | Adding or tightening a lint / coverage / static-analysis / architecture gate | **`ratchet-quality-gates`** |
 | Editing an OpenAPI spec, codegen, or debugging a generated type | **`spec-first-openapi`** |
+| Closing out a session — turning corrections and rework into skill edits | **`reflection`** |
 
 Most real tasks pull in two or three: e.g. "add an endpoint" → `spec-first-openapi` (contract)
 + `readable-code` (the handler) + `incremental-tests` (the contract test).
@@ -44,14 +46,17 @@ Most real tasks pull in two or three: e.g. "add an endpoint" → `spec-first-ope
 1. **Understand under a net.** Read the whole unit you're touching. Confirm it's covered by
    tests; if coverage is thin, pin current behaviour with characterization tests *first*
    (via `incremental-tests`).
-2. **Make the change** at the right altitude — generalize the underlying mechanism rather
+2. **Clear the way first if it doesn't fit** — reshape the existing code in its own
+   behaviour-preserving commit (`refactoring`), *then* add the behaviour. Never mix the two
+   in one diff.
+3. **Make the change** at the right altitude — generalize the underlying mechanism rather
    than layering a special case on shared infrastructure. Hold to `readable-code` as you go.
-3. **Test it** — one test at a time (`incremental-tests`), riskiest behaviour first.
-4. **Run the gates green** — lint (`--max-warnings=0`), type-check/build, the full test
+4. **Test it** — one test at a time (`incremental-tests`), riskiest behaviour first.
+5. **Run the gates green** — lint (`--max-warnings=0`), type-check/build, the full test
    suite, and any static-analysis/coverage gate. Fix the code; never disable a test or a
    rule to silence a failure. If a gate is new and the repo isn't there yet, ratchet it
    (`ratchet-quality-gates`).
-5. **Self-review** against the `readable-code` definition-of-done checklist before calling it
+6. **Self-review** against the `readable-code` definition-of-done checklist before calling it
    done.
 
 ## Non-negotiables (from the project checklist)
@@ -64,7 +69,8 @@ Most real tasks pull in two or three: e.g. "add an endpoint" → `spec-first-ope
 - **Don't commit generated code** — gitignore it and regenerate in the build; drop any
   diff gate that would be a no-op over it. (Details in `spec-first-openapi`.)
 - **Refactors are behaviour-preserving only under a test net** — pin, refactor, re-run,
-  ideally with mutation testing.
+  ideally with mutation testing. Structure changes never share a commit with behaviour
+  changes. (Details in `refactoring`.)
 
 ## When something isn't covered here
 

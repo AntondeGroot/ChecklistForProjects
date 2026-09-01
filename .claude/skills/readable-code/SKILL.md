@@ -5,6 +5,7 @@ description: >-
   Java, etc.). Enforces the readability bar from the project checklist: one level of
   abstraction per function (SLAP — no mixing orchestration with low-level detail), low
   cognitive complexity, files ≤300 lines, one responsibility per class/file/function,
+  folders grouped by concept rather than by technical kind (no `utils`/`common` buckets),
   intention-revealing names, and named constants instead of magic numbers. Apply it
   before treating any code change as done.
 ---
@@ -87,7 +88,67 @@ is three classes. Extract a cohesive collaborator it delegates to.
   accrete data-layer logic until it's a god object. Route that through a service (this is
   what `eslint-plugin-boundaries` / ArchUnit enforce).
 
-### 5. Intention-revealing names; no magic numbers
+### 5. Folders are units too — group by concept, not by kind
+
+The one-responsibility rule doesn't stop at the file. A folder is a unit, and a flat folder
+of forty files is a god class spread across forty files: nothing tells you what belongs in
+it, so everything does.
+
+**Two things go wrong here, and a folder can fail either one independently:**
+
+1. **No concept.** `utils/` is wrong at *any* size — with 8 files or 2 — because "utils" is
+   not a concept, it's the absence of one.
+2. **Too many files.** A well-named folder is wrong once it's large, because a concept with
+   30 files underneath it has *sub*-concepts it hasn't named. `checkout/` at 30 files isn't
+   one thing; it's payment, address, tax, and confirmation sharing a room. Nest them.
+
+A good name does not buy you a high file count. **Target ≤8 non-test files per folder;
+10–15 means look now; past 15, split.** The bound is the same one as for a class: you should
+be able to take in the whole folder in one screen, without scrolling, and predict what's in
+it before you read the names.
+
+Smell signals, in order of reliability:
+
+- **You can't describe the folder in one sentence** without "and", "various", or "stuff".
+- **Bucket names**: `utils`, `helpers`, `common`, `misc`, `shared`, `core`, `base`. Each one
+  is a note saying *I didn't name the concept*. (`shared/` is legitimate only when it's a
+  real layer boundary the architecture gate knows about — not as a dumping ground.)
+- **Files in it change for unrelated reasons** — divergent change, one level up.
+- **Adding one feature means editing five sibling folders** — that's grouping by technical
+  kind instead of by concept.
+- **Over ~8 non-test files**: the folder has outgrown one concept — find the sub-concepts.
+
+**The one real exception is a catalogue, not a well-named module.** Some folders are *looked
+things up in*, never read as a whole: DB migrations, generated model classes, icon or asset
+sets, test fixtures, a `domain/` of independent entities. Their contents are peers with no
+sub-structure to find, and the folder has no reading order. Those may run long. The test is
+simple: **do you read this folder, or index into it?** If a newcomer would have to read it to
+work in it, the count applies.
+
+Group the top level by **feature/concept**; let technical kind be a detail *inside* it:
+
+```
+✗ grouped by kind — every feature is smeared across every folder
+src/components/{CheckoutForm, CartBadge, ProfileCard, …30 more}
+src/services/{checkout, cart, profile, …30 more}
+src/models/{…30 more}
+
+✓ grouped by concept — a feature is one folder; its layers live inside
+src/checkout/{CheckoutForm.tsx, checkout.service.ts, checkout.model.ts}
+src/cart/{…}
+src/profile/{…}
+```
+
+- **Keep the folder's public surface narrow** — a few entry points, the rest internal (a
+  barrel `index.ts` in TS, package-private in Java). If every file is exported, the folder
+  is a namespace, not a unit.
+- **The opposite smell counts too**: a chain of single-child folders (`a/b/c/d/One.java`) is
+  over-nesting. Collapse it.
+- On a brownfield tree, **do not reorganize in one commit** — moving files destroys blame
+  and review. Freeze the current per-folder counts as ceilings and split along the path of
+  change (`ratchet-quality-gates`, `refactoring`).
+
+### 6. Intention-revealing names; no magic numbers
 
 Names state *what* something does in domain terms, so the code needs no explanatory
 comment.
@@ -99,12 +160,12 @@ comment.
 - If you need a comment to explain *what* a line does, rename until you don't. Keep comments
   for *why*, not *what*.
 
-### 6. No near-duplicate blocks
+### 7. No near-duplicate blocks
 
 Collapse two blocks that differ only in a value into one well-named helper, passing the
 varying part as a parameter. Repeated structure is a maintenance trap — the copies drift.
 
-### 7. Prefer modern language idioms — and heed the IDE's suggestions
+### 8. Prefer modern language idioms — and heed the IDE's suggestions
 
 Use the clearest idiom the language version offers. A named accessor reads as intent; an
 index is a puzzle the reader has to solve.
@@ -133,7 +194,7 @@ this checklist is about — `get(0)` → `getFirst()`, `.stream().collect(toList
 - The same applies to whatever the CI static-analysis gate (PMD/SonarJS/SpotBugs) reports:
   the IDE is the fast local echo of those gates, so fixing it in the editor keeps CI green.
 
-### 8. Import types; don't inline fully-qualified names
+### 9. Import types; don't inline fully-qualified names
 
 Refer to a type by its short name and put the package in an `import`. A fully-qualified name
 spliced into a declaration or signature is line noise the reader has to mentally strip to see
@@ -151,7 +212,7 @@ void register(Consumer<Order> handler) { ... }
 
 The rare exception is a genuine name clash (e.g. two `Date` types in one file) where one must
 stay qualified to disambiguate — that's a deliberate choice, not the default. This too is an
-IDE inspection (rule 7); let the editor add the import for you.
+IDE inspection (rule 8); let the editor add the import for you.
 
 ## Definition of done — self-check before finishing
 
@@ -162,21 +223,23 @@ Run this over your diff before calling a change complete:
 - [ ] Guard clauses used; happy path is un-indented; no `else` after `return`.
 - [ ] No magic numbers/strings — all named.
 - [ ] Each touched file is one responsibility and ≤300 lines (or ratcheted with a `TODO`).
+- [ ] The folder you added a file to is still one nameable concept — not a `utils`/`common`
+      bucket, and not silently past its frozen file-count ceiling.
 - [ ] Names are intention-revealing in domain terms; no `tmp`, `data2`, `doStuff`.
 - [ ] No near-duplicate blocks left behind.
 - [ ] Modern idioms used (`getFirst()`/`getLast()` over `get(0)`/`get(size()-1)`, `.toList()`, etc.); IDE inspection warnings on touched lines are cleared or deliberately suppressed with a reason.
 - [ ] Types referred to by short name with an `import` — no fully-qualified names inline (except a deliberate clash-disambiguation).
 
-## Refactor under a safety net
+## Reaching this bar in existing code
 
-Readability changes are still changes. Before refactoring existing code, confirm it's
-covered by tests and read the whole unit it lives in. If coverage is thin, pin current
-behaviour with **characterization tests first** (write them via the `incremental-tests`
-skill), then refactor, then re-run the full suite — plus mutation testing if set up — to
-confirm the change is genuinely behaviour-preserving.
+This skill states the **bar**. Getting messy existing code up to it — safely, without
+changing behaviour — is its own discipline: work under a test net, take one named move at
+a time, stay green after every step, and keep structure changes out of behaviour commits.
+Load **`refactoring`** whenever you're restructuring code that already works.
 
 ## Related skills
 
+- Restructuring existing code to reach this bar → **`refactoring`**.
 - Writing or adding tests as part of this work → **`incremental-tests`** (show one test at a
   time so they're actually read).
 - Introducing/tightening a strict lint, coverage, or architecture gate → **`ratchet-quality-gates`**.
