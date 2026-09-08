@@ -56,8 +56,12 @@ Most real tasks pull in two or three: e.g. "add an endpoint" → `spec-first-ope
    suite, and any static-analysis/coverage gate. Fix the code; never disable a test or a
    rule to silence a failure. If a gate is new and the repo isn't there yet, ratchet it
    (`ratchet-quality-gates`).
-6. **Self-review** against the `readable-code` definition-of-done checklist before calling it
-   done.
+6. **Read your own diff** against the `readable-code` definition-of-done checklist — and read
+   what is *missing* from it: `git status` for a file you did not mean to touch, and a test
+   count that went **down**. Green gates are not this step: no linter flags `get(0)` for
+   `getFirst()`, a name that says nothing, or a function at two levels of abstraction — and a
+   suite reports green just as happily with a deleted test file as with a passing one. If you
+   reported done straight off a green test run, you skipped it.
 
 ## Non-negotiables (from the project checklist)
 
@@ -66,6 +70,10 @@ Most real tasks pull in two or three: e.g. "add an endpoint" → `spec-first-ope
   architectural violations. A warning is an error.
 - **Prove a gate can go red before trusting it** — a green check that classifies nothing is
   the worst failure mode. (Details in `ratchet-quality-gates`.)
+- **Never answer a question with a command that can destroy the answer.** `ls`, `cat` and
+  `git status` say whether something exists; `rm`, `>` and `cat >>` say so by changing it.
+  Deletion is a deliberate step on a path you have just looked at — never the cleanup half
+  of a probe.
 - **Don't commit generated code** — gitignore it and regenerate in the build; drop any
   diff gate that would be a no-op over it. (Details in `spec-first-openapi`.)
 - **Refactors are behaviour-preserving only under a test net** — pin, refactor, re-run,

@@ -78,6 +78,13 @@ ESLint does not read your stylesheets — nothing lints CSS/SCSS until you add S
 - [ ] Add Prettier + `.prettierrc`
 - [ ] CI check: `prettier --check .`
 - [ ] **Set `"quoteProps": "consistent"`.** The default, `as-needed`, strips quotes from every key that doesn't strictly need them — so a map keyed by hyphenated strings comes out half-quoted (`up: '↑'` beside `'up-left': '↖'`), which reads as an accident in the source rather than what it is: a syntax rule about identifiers. `consistent` quotes every key in an object as soon as one of them has to be, and leaves objects that need no quotes alone. Cheap to adopt late — it only touches objects that already contain a quoted key.
+- [ ] **Angular templates need `"parser": "angular"`, or control-flow blocks never get indented.** Prettier picks its parser from the file extension, and `.html` gets the plain `html` parser, which has no idea `@if (…) {` opened anything — it is text, so everything inside the block stays flat against the block itself, and two sibling blocks are glued together as `} @if (…) {`. Nothing warns: `prettier --check` passes, because that flat shape *is* what the html parser considers formatted. It shows up only as templates that read as though nobody had run a formatter over them. Override by path rather than switching globally, so `src/index.html` and any plain HTML keep the standard parser:
+  ```json
+  "overrides": [{ "files": "src/app/**/*.html", "options": { "parser": "angular" } }]
+  ```
+  - **Adopt it early.** The first run reflows every template at once — ~570 lines across ten files in one small app — which is a large whitespace-only diff to land on top of feature work, and it conflicts with anything else in flight.
+  - **Run the component tests, not just `--check`.** The angular parser lays each control-flow block on its own line, and in a whitespace-sensitive spot those newlines are *content*: a template deliberately written on one line to avoid emitting spaces gets reflowed, and every text node inside it gains a leading and trailing space. `<pre>`, `<textarea>` and any `@if`/`@for` sitting between inline elements are the places to check. Prettier cannot know which is which, so the fix is to say so — `<!-- prettier-ignore -->` on the node, and a comment saying why, or the next person reformats it back.
+  - **Prettier will not fix comment interiors.** Continuation lines inside a multi-line `<!-- … -->` are verbatim to it, so when the opening `<!--` shifts right they stay where they were and end up hanging under the wrong column. Re-align them in the same pass (to the opener plus the width of `<!-- `), because the next formatter run cannot, and a reviewer will read the result as sloppy rather than as a tool's limit.
 
 ### CSS and touch input
 
