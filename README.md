@@ -337,17 +337,40 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 
 ## CI / GitHub
 
-### Branch protection (Settings → Branches → main)
+### Branch protection (Settings → Rules → Rulesets → New ruleset → Import a ruleset)
 
-- [ ] Require a pull request before merging (no direct pushes to main)
-- [ ] Require status checks to pass before merging — select the CI job(s)
-- [ ] Require branches to be up to date before merging
-- [ ] Do not allow bypassing the above settings (disables admin override)
-- [ ] Disallow force pushes
-- [ ] Disallow branch deletion
+- [ ] Import [`ruleset.json`](ruleset.json). It targets the default branch and enforces:
+  - a pull request before merging (no direct pushes; 0 approvals, since it's a solo repo)
+  - the `ci` status check from GitHub Actions must pass
+  - no force pushes, no branch deletion
+  - no bypass list, so admins can't override it either
+- [ ] Add a single `ci` job that `needs:` every other job. The ruleset requires only that one job, so the same file works in every repo however its jobs are named, and adding or renaming a job never means editing the ruleset:
+  ```yaml
+  ci:
+    if: always()
+    # Delete any job this project doesn't have. A name with no matching job makes the whole workflow invalid.
+    needs: [lint, openapi-lint, backend, frontend, e2e, mutation]
+    runs-on: ubuntu-latest
+    steps:
+      - run: exit 1
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+  ```
+  `if: always()` matters: without it, a failed dependency _skips_ `ci`, and a skipped required check counts as passing.
+- [ ] **Don't** require branches to be up to date before merging (`strict_required_status_checks_policy: false`). With slow test suites, every merge forces each other open PR to rebase and run CI again, so merging N PRs costs N² CI runs. The risk you accept is that two PRs that are each green may conflict in meaning (not in text) once both are merged. To catch that, also run CI on `push: branches: [main]`.
+
+### Who can merge (outside contributors)
+
+On a personal repo, only you and collaborators you invited can merge. Anyone else can only open a PR from a fork. So `required_approving_review_count: 0` is safe, and setting it to 1 would block _you_, because you can't approve your own PR. The real risks are elsewhere:
+
+- [ ] **Settings → Collaborators:** keep it empty, or only people you'd trust with merge rights.
+- [ ] **Settings → Actions → General → "Require approval for all external contributors"**, so a stranger's PR can't run workflows until you click approve.
+- [ ] **Never use `pull_request_target` or `workflow_run`** to build or test PR code. They run fork code with your secrets and a write token. Plain `on: pull_request` from a fork only gets a read-only token.
+- [ ] **Dependabot auto-merge:** gate on `github.event.pull_request.user.login == 'dependabot[bot]'`, not `github.actor`. The actor is whoever triggered the run, not whoever wrote the PR.
+- [ ] **Settings → Actions → General → leave "Allow GitHub Actions to create and approve pull requests" off.**
 
 ### Every pull request pipeline must run
 
+- [ ] `npx @redocly/cli@2 lint <spec>` — if the project has an OpenAPI spec; run it before any step that generates code from the spec
 - [ ] `npm ci`
 - [ ] `npm run lint`
 - [ ] `npm run test -- --coverage`

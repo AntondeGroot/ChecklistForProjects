@@ -70,10 +70,12 @@ Most real tasks pull in two or three: e.g. "add an endpoint" → `spec-first-ope
   architectural violations. A warning is an error.
 - **Prove a gate can go red before trusting it** — a green check that classifies nothing is
   the worst failure mode. (Details in `ratchet-quality-gates`.)
-- **Never answer a question with a command that can destroy the answer.** `ls`, `cat` and
-  `git status` say whether something exists; `rm`, `>` and `cat >>` say so by changing it.
-  Deletion is a deliberate step on a path you have just looked at — never the cleanup half
-  of a probe.
+- **Never destroy what you have not just looked at.** `ls`, `cat` and `git status` answer
+  "does this exist?"; `rm`, `>` and `cat >>` answer it by changing it, so a probe never
+  cleans up after itself. The same holds *inside* a file: cutting from one marker to another
+  takes whatever happens to sit between them, which is how two unrelated methods and a field
+  went missing. Delete by matching the exact text you mean to remove, and assert it appears
+  once — never by index, unless you have printed the span first.
 - **Don't commit generated code** — gitignore it and regenerate in the build; drop any
   diff gate that would be a no-op over it. (Details in `spec-first-openapi`.)
 - **Refactors are behaviour-preserving only under a test net** — pin, refactor, re-run,
