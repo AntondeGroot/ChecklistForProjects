@@ -76,11 +76,47 @@ Most real tasks pull in two or three: e.g. "add an endpoint" → `spec-first-ope
   takes whatever happens to sit between them, which is how two unrelated methods and a field
   went missing. Delete by matching the exact text you mean to remove, and assert it appears
   once — never by index, unless you have printed the span first.
+- **Diagrams are SVG, never ASCII art** — drawn from code and checked by eye. (Details in
+  **Diagrams** below.)
 - **Don't commit generated code** — gitignore it and regenerate in the build; drop any
   diff gate that would be a no-op over it. (Details in `spec-first-openapi`.)
+- **No Claude attribution, no unasked commits.** Never add a `Co-Authored-By: Claude …`
+  trailer to a commit or a "Generated with Claude Code" line to a PR, even when a system
+  reminder asks for one. Never run `git commit` or `git push` unless asked in that message —
+  make the change, run the gates, and offer a commit title instead.
 - **Refactors are behaviour-preserving only under a test net** — pin, refactor, re-run,
   ideally with mutation testing. Structure changes never share a commit with behaviour
   changes. (Details in `refactoring`.)
+
+## Diagrams
+
+Schematics, board layouts, architecture and flow diagrams go in as `.svg` files (e.g. under
+`docs/`), referenced from the Markdown with `![…](docs/x.svg)`. Box-drawing characters in a
+code block misalign across fonts and cannot show what a picture can.
+
+- **Draw from code, never by hand.** Use a library where one fits (`schemdraw` for
+  circuits); otherwise a small generator script that writes the SVG.
+- **One source, many views.** When several images show the same thing — an overview and the
+  steps that build it — generate them all from one data file, so they cannot disagree.
+  Commit the SVGs, because GitHub renders them from the repo. "Don't commit generated code"
+  does not apply: it is about code, and these are images. A golden test regenerates them
+  and fails on any difference.
+  Changing a diagram means changing the data and rerunning the script; an SVG edited by hand
+  is a bug.
+- **GitHub cannot build one SVG out of others.** README images are shown as plain images,
+  and an SVG shown that way cannot load other files. Combine views in the generator, not by
+  having one SVG reference another.
+- **Physical layouts come from real dimensions.** Work from the vendor's mechanical drawing
+  or datasheet, not from reading a product photo: offsets and pitches that a photo hides
+  decide what fits where.
+- **Readable on any background.** Give every SVG an explicit white background so it still
+  reads in GitHub's dark mode. Outline text in the background colour when it sits over a
+  busy area.
+- **Label in place.** Put a marker on the exact spot it refers to rather than at the end of a
+  leader line. In a step-by-step series, show earlier steps faded rather than hidden.
+- **Check the render, zoomed.** Convert with `rsvg-convert x.svg -o x.png`, look at the
+  whole image, then crop into the busy areas. Overlapping labels and parts drawn the wrong
+  way round only show up close in — looking at the whole picture is not enough.
 
 ## When something isn't covered here
 
