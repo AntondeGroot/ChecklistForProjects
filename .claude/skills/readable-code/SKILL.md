@@ -4,7 +4,7 @@ description: >-
   Use when writing new code OR refactoring existing code in any language (TypeScript,
   Java, etc.). Enforces the readability bar from the project checklist: one level of
   abstraction per function (SLAP — no mixing orchestration with low-level detail), low
-  cognitive complexity, files ≤300 lines, one responsibility per class/file/function,
+  cognitive complexity (≤15), methods ≤25 lines, files ≤200 lines, one responsibility per class/file/function,
   folders grouped by concept rather than by technical kind (no `utils`/`common` buckets),
   intention-revealing names, and named constants instead of magic numbers. Apply it
   before treating any code change as done.
@@ -47,6 +47,9 @@ void placeOrder(Cart cart) {
 }
 ```
 
+Keep methods **≤25 lines** (blank lines and comments not counted; ESLint
+`max-lines-per-function` and Checkstyle `MethodLength` enforce it, tests exempt).
+
 Smell: scrolling *inside* a method to understand it, or a comment that labels a block
 (`// build the payload`) — that block wants to be a named method.
 
@@ -63,13 +66,13 @@ boolean chains). Drive it down with:
   branches is three methods.
 - **No `else` after a `return`.** It flattens the shape.
 
-The linters that enforce this (`sonarjs/cognitive-complexity`, PMD design rules) are the
-floor, not the goal — write below the limit, don't code up to it.
+The linters that enforce this (`sonarjs/cognitive-complexity` and PMD `CognitiveComplexity`,
+both capped at **15** per method) are the floor, not the goal — write below the limit, don't code up to it.
 
-### 3. Short files — ≤300 lines
+### 3. Short files — ≤200 lines
 
-A file over ~300 lines is almost always doing more than one thing. Split it along
-**concept** boundaries (see rule 4). 300 is the target for hand-written source; pure
+A file over ~200 lines is almost always doing more than one thing. Split it along
+**concept** boundaries (see rule 4). 200 is the target for hand-written source; pure
 data/enum/interface files may run longer and that's fine.
 
 On a brownfield repo where files already exceed this, **do not big-bang refactor** — see
@@ -222,7 +225,8 @@ Run this over your diff before calling a change complete:
 - [ ] No method needs a block-labelling comment — those blocks became named methods.
 - [ ] Guard clauses used; happy path is un-indented; no `else` after `return`.
 - [ ] No magic numbers/strings — all named.
-- [ ] Each touched file is one responsibility and ≤300 lines (or ratcheted with a `TODO`).
+- [ ] Each touched method is ≤25 lines with cognitive complexity ≤15.
+- [ ] Each touched file is one responsibility and ≤200 lines (or ratcheted with a `TODO`).
 - [ ] The folder you added a file to is still one nameable concept — not a `utils`/`common`
       bucket, and not silently past its frozen file-count ceiling.
 - [ ] Names are intention-revealing in domain terms; no `tmp`, `data2`, `doStuff`.
