@@ -98,7 +98,7 @@ Debugging forward from a broken refactor is how a two-hour cleanup becomes a two
 | Long boolean condition | **Decompose Conditional** — extract a named predicate |
 | The same `switch`/`if`-chain on a type code in 2+ places | **Replace Conditional with Polymorphism** (or Strategy) |
 | Near-duplicate blocks differing by one value | **Extract Method** with that value as a parameter |
-| God class; file over ~300 lines; unrelated concerns | **Extract Class** along a concept boundary |
+| God class; file over ~200 lines; unrelated concerns | **Extract Class** along a concept boundary |
 | `utils`/`common`/`helpers` bucket, at any size | **Split the folder by concept** — see mechanics below |
 | Well-named folder that has grown past ~8 files | **Find the sub-concepts and nest them** |
 | Top-level folders named for technical kind (`components`, `services`, `models`) | **Regroup by feature**, kind becomes a subfolder |
@@ -197,7 +197,7 @@ you grouped by import rather than by reason-to-change; try again.
 - [ ] Public API / OpenAPI contract untouched (or it's a deliberate contract change, handled
       via `spec-first-openapi`).
 - [ ] The result clears the `readable-code` bar — SLAP, intention-revealing names, no magic
-      literals, ≤300-line files, low cognitive complexity.
+      literals, ≤200-line files, low cognitive complexity.
 - [ ] Leftovers deleted: the old method, the now-unused parameter, the unreachable branch,
       the dead comment, the folder left empty by a move.
 - [ ] File moves are in their own commit, with no content changes riding along.

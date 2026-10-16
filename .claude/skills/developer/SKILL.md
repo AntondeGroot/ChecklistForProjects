@@ -31,7 +31,7 @@ areas below, load that skill and follow it.
 
 | When you are…​ | Load skill |
 | --- | --- |
-| Writing or changing any code (SLAP, cognitive complexity, ≤300-line files, cohesion, names) | **`readable-code`** |
+| Writing or changing any code (SLAP, complexity ≤15, ≤25-line methods, ≤200-line files, cohesion, names) | **`readable-code`** |
 | Restructuring existing code without changing behaviour (extract, split a god class, kill duplication, introduce a seam) | **`refactoring`** |
 | Writing, adding, or generating tests | **`incremental-tests`** — show **one test at a time** so it's actually read |
 | Adding or tightening a lint / coverage / static-analysis / architecture gate | **`ratchet-quality-gates`** |

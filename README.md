@@ -39,12 +39,13 @@
 - [ ] Add `eslint-plugin-sonarjs` and extend `sonarjs.configs.recommended` (enables `cognitive-complexity`; the TS analog to PMD's design rules). In flat config it self-registers — don't also add `plugins: { sonarjs }`. The recommended set has **no autofixers** for most rules (`--fix` does nothing), so the first run is all manual triage. Like PMD, some recommended rules are noise and want a decision (the sonarjs analog of the PMD exclusion table):
   - `sonarjs/todo-tag` — **turn off.** It errors on every `TODO`, which directly fights the ratchet philosophy used throughout this checklist (pinned-debt overrides and boundary exemptions all point at a `TODO`). This one bites the moment you add your first ratchet marker.
   - `sonarjs/pseudo-random` — off when there's no security-sensitive randomness (game dice, animation jitter). It's a crypto rule.
-  - `sonarjs/cognitive-complexity` — ratchet it per-file like the size caps (`['error', <current>]` with a `TODO`) rather than refactoring a big untested method up front.
+  - `sonarjs/cognitive-complexity` — set it explicitly to `['error', 15]` (the recommended default, written out so the limit is visible and matches PMD's `CognitiveComplexity` on the server). On a brownfield repo, ratchet it per-file like the size caps (`['error', <current>]` with a `TODO`) rather than refactoring a big untested method up front.
   - Per-site suppress (keep the rule on) for legitimate cases: `no-angular-bypass-sanitization` (rendering your own static i18n HTML), `post-message` (an embed handshake to a host whose origin is unknown until it replies), `super-linear-regex` (a regex over trusted, small input like your own CSS in a test), `function-return-type` (a helper that legitimately returns a union — e.g. a value coerced to its declared type).
   - `sonarjs/prefer-specific-assertions` — high-value but noisy in specs (`expect(x.length).toBe(n)` → `expect(x).toHaveLength(n)`); fix them (a `perl -pe` sweep works) rather than disabling — better failure messages.
 - [ ] God-object / size caps — stop a class growing one harmless method at a time. `cognitive-complexity` only guards individual _methods_; these guard the file/function/class as a whole:
-  - `max-lines: ['error', { max: 400, skipBlankLines: true, skipComments: true }]`
-  - `max-lines-per-function: ['error', { max: 80, skipBlankLines: true, skipComments: true }]`
+  - `max-lines: ['error', { max: 200, skipBlankLines: true, skipComments: true }]`
+  - `max-lines-per-function: ['error', { max: 25, skipBlankLines: true, skipComments: true }]`
+  - These match the Java side (Checkstyle `FileLength` 200, `MethodLength` 25; see [Static analysis](#static-analysis)), so one bar applies to the whole project.
   - `max-classes-per-file: ['error', 1]`
   - Exempt specs (legitimately long: fixtures, provider setup) with a `files: ['**/*.spec.ts']` override turning the size caps off.
   - **Adopt as a ratchet, not a big-bang.** Files that already exceed the cap get a per-file override pinned at their _current_ counted size (run lint once to read the reported number — it differs from `wc -l` because of `skipBlankLines`/`skipComments`). That's a frozen ceiling: they can only shrink, never grow. Add a `TODO` to lower the number as the file is slimmed, and delete the override once it drops under the global cap. Pinning keeps CI green while making the debt explicit and non-growing; a hard global cap on a brownfield repo just leaves the build red and blocks unrelated work.
@@ -142,8 +143,18 @@ ESLint does not read your stylesheets — nothing lints CSS/SCSS until you add S
 ### Static analysis
 
 - [ ] Checkstyle
+  - [ ] `FileLength` max 200 and `MethodLength` max 25 with `countEmpty=false` — the same bar as the client's
+        `max-lines` and `max-lines-per-function`. Exempt tests in `checkstyle-suppressions.xml`
+        (`<suppress files="[/\\]test[/\\]" checks="FileLength|MethodLength"/>`), like the client's spec override.
 - [ ] SpotBugs
 - [ ] PMD
+  - [ ] `category/java/design.xml/CognitiveComplexity` at 15 per method, the same bar as `sonarjs/cognitive-complexity`.
+        **Off by one:** PMD reports at `reportLevel` _and above_, so allowing 15 means `reportLevel` **16**
+        (its message then reads "complexity of 16, current threshold is 16"). Probe it with a 15- and a 16-branch method.
+  - [ ] `category/java/design.xml/GodClass` — flags classes with high total complexity (WMC ≥ 47), heavy use of
+        other classes' data (ATFD > 5) and methods that share little state (TCC < 1/3).
+  - Pull these two in by reference rather than enabling the whole `design` category, which is mostly noise
+    (see the Design rows in the exclusion table below).
 - [ ] Error Prone
 - [ ] NullAway
 - [ ] ArchUnit for architecture rules — one `ArchitectureTest` class, but **tick the rules individually**; a
