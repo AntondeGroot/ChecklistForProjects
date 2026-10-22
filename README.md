@@ -320,6 +320,16 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 
 ---
 
+## Python
+
+### CI install
+
+- [ ] **Install wheels only in CI: `pip install --only-binary=:all: -e ".[dev]"`.** (Not `--no-binary`, which does the opposite: it forces every package to build from source.) Packages often have no wheels yet for the newest Python, and pip then quietly builds them from source, on every run and every OS in the matrix. In one project scikit-image had no wheels for Python 3.15, so the install took almost 3 minutes for 11 seconds of tests. With `--only-binary` the install fails fast with `No matching distribution found for ...` instead. That makes it the gate for Renovate, which cannot check for wheels itself: a Python bump that a dependency has no wheels for yet goes red, and stays unmerged until the wheels are there.
+  - The option contains `: `, which YAML reads as a key. Put the command in a `run: |` block, or the workflow fails to parse.
+  - Pin the Python version in `.python-version` alone, and point `actions/setup-python` at it with `python-version-file`, plus `cache: pip`, so downloaded wheels are kept between runs.
+
+---
+
 ## OpenAPI / API contract
 
 ### Lint the spec in CI — the codegen build will NOT catch malformations
