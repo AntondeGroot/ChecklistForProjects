@@ -87,6 +87,11 @@ Most real tasks pull in two or three: e.g. "add an endpoint" → `spec-first-ope
 - **Refactors are behaviour-preserving only under a test net** — pin, refactor, re-run,
   ideally with mutation testing. Structure changes never share a commit with behaviour
   changes. (Details in `refactoring`.)
+- **Docs describe what is there, never what was removed.** When a feature is taken out,
+  delete every mention of it from the docs, comments and docstrings. Do not leave a line
+  explaining its absence ("X is not shown, because…", "there is no longer a Y") — a reader
+  who never saw the old version only learns about something that does not exist. The
+  reason for removing it belongs in the commit message, not in the documentation.
 
 ## Diagrams
 
