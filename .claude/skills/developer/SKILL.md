@@ -76,6 +76,10 @@ Most real tasks pull in two or three: e.g. "add an endpoint" → `spec-first-ope
   takes whatever happens to sit between them, which is how two unrelated methods and a field
   went missing. Delete by matching the exact text you mean to remove, and assert it appears
   once — never by index, unless you have printed the span first.
+- **In shell code, test strings with `-z` / `-n`, never with `!`.** Write
+  `[[ -z "$x" ]]` for "empty" and `[[ -n "$x" ]]` for "not empty" — not `[[ ! -n "$x" ]]`
+  or `! [[ -z "$x" ]]`. In zsh a `!` can trigger history expansion, and a double negative
+  is harder to read than the operator that says what it means.
 - **Diagrams are SVG, never ASCII art** — drawn from code and checked by eye. (Details in
   **Diagrams** below.)
 - **Don't commit generated code** — gitignore it and regenerate in the build; drop any
