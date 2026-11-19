@@ -317,6 +317,10 @@ These adjustments are needed when using Spring Boot with strict static analysis.
 ### Dependency management
 
 - [ ] `maven-enforcer-plugin` — enforce minimum Maven/Java versions, ban duplicate dependencies
+- [ ] **Resolve personal projects from Maven Central, not the employer Nexus.** `~/.m2/settings.xml` mirrors every repository (`<mirrorOf>*</mirrorOf>`) to the work Nexus, so a personal project's downloads would be proxied, cached and logged there — and they fail outright when the JDK doesn't trust its certificate (`PKIX path building failed`). A build that passes is no proof: it only means every artifact was already in `~/.m2/repository`, and the first new dependency fails. Give the project its own settings next to the pom (in the same `.mvn/` as `jvm.config`, see above):
+  - `.mvn/settings.xml` — an empty `<settings/>`, so no mirror applies and Maven falls back to Central.
+  - `.mvn/maven.config` — `--settings=${maven.multiModuleProjectDirectory}/.mvn/settings.xml`. Use the variable rather than a relative path so it works both from the module dir (IDE) and from the repo root with `--file backend/pom.xml` (CI, deploy scripts).
+  - Verify: `mvn -B clean verify | grep nexus` prints nothing. Artifacts cached from the Nexus are re-checked once against Central and then reused, so nothing is downloaded twice. If IntelliJ still uses the global file, point Settings → Build Tools → Maven → User settings file at `.mvn/settings.xml`.
 
 ---
 
@@ -377,6 +381,7 @@ These adjustments are needed when using Spring Boot with strict static analysis.
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
   ```
   `if: always()` matters: without it, a failed dependency _skips_ `ci`, and a skipped required check counts as passing.
+- [ ] **Settings → General → Pull Requests:** turn on **Allow auto-merge** and **Automatically delete head branches**. These are repository settings, not ruleset rules, so importing `ruleset.json` does not set them. 
 - [ ] **Don't** require branches to be up to date before merging (`strict_required_status_checks_policy: false`). With slow test suites, every merge forces each other open PR to rebase and run CI again, so merging N PRs costs N² CI runs. The risk you accept is that two PRs that are each green may conflict in meaning (not in text) once both are merged. To catch that, also run CI on `push: branches: [main]`.
 
 ### Who can merge (outside contributors)
