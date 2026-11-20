@@ -130,6 +130,6 @@ code block misalign across fonts and cannot show what a picture can.
 ## When something isn't covered here
 
 The full, opinionated rationale (PMD/SpotBugs/NullAway/ArchUnit config, Spring Boot caveats,
-Dependabot grouping, branch protection, CI pipeline) lives in the `ChecklistForProjects`
+Renovate grouping, branch protection, CI pipeline) lives in the `ChecklistForProjects`
 README. Reach for it when setting up or hardening a project rather than reinventing the
 decision.
