@@ -124,9 +124,10 @@ ESLint does not read your stylesheets — nothing lints CSS/SCSS until you add S
 ### Security
 
 - [ ] `npm audit` (and fail CI on critical/high findings)
-- [ ] Add Dependabot or Renovate for dependency updates
-- [ ] Group lockstep packages in `dependabot.yml` via `groups:`. Without it, Dependabot opens **one PR per package** — a framework bump (Angular, Spring) becomes a dozen PRs, and they each **fail CI individually** because the packages are peer-versioned (e.g. `@angular/core` ahead of `@angular/common` won't install). One PR per group keeps them coherent so CI passes. Order matters — a package joins the first group it matches, so put specific groups (`@angular*`, `org.springframework*`) before broad `minor`/`patch` catch-alls; leave majors ungrouped so each gets its own PR to review.
-- [ ] Auto-merge minor/patch Dependabot PRs via a workflow using `dependabot/fetch-metadata` + `gh pr merge --auto` (gate on `update-type == semver-minor|semver-patch`). Prerequisites: enable **Settings → General → Allow auto-merge**, and configure **branch protection with required status checks** — `--auto` only completes once required checks pass, so without a required check it can't gate (and grouping is what lets those checks pass in the first place).
+- [ ] Install the Renovate GitHub app for dependency updates, with a `renovate.json` that extends `config:recommended`.
+- [ ] **Group lockstep packages.** Without grouping, a framework bump (Angular, Spring) becomes a dozen PRs, one per package, and they each **fail CI individually** because the packages are peer-versioned (e.g. `@angular/core` ahead of `@angular/common` won't install). One PR per group keeps them coherent so CI passes. `config:recommended` already groups known monorepos such as Angular and Spring Boot; for other packages that must move together, add a `packageRules` entry with `matchPackageNames` and a `groupName`. Majors get their own PR by default, so each one gets reviewed.
+- [ ] **Automerge minor/patch updates** with a `packageRules` entry: `"matchUpdateTypes": ["minor", "patch"], "matchCurrentVersion": "!/^0/", "automerge": true`. The `matchCurrentVersion` part skips `0.x` packages, where a minor bump may break things. Renovate uses GitHub's own auto-merge, so enable **Settings → General → Allow auto-merge**, and configure **branch protection with required status checks**: the merge only completes once required checks pass, so without a required check nothing gates it (and grouping is what lets those checks pass in the first place).
+- [ ] **Add yourself as reviewer on Renovate PRs: `"reviewers": ["AntondeGroot"]` in `renovate.json`.** Renovate opens its PRs as a bot, so they don't show up on [github.com/pulls](https://github.com/pulls) and you only see them by visiting each repo. As a requested reviewer, every Renovate PR from every repo appears under **Review requests** there. Renovate leaves out reviewers on PRs it plans to automerge, so also set `"assignAutomerge": true` if you use automerge and still want to see those PRs.
 - [ ] Never use `[innerHTML]` with unsanitized input; use Angular's `DomSanitizer` if binding HTML is unavoidable
 - [ ] Add CSP headers
 - [ ] Ensure HTTPS is enforced end-to-end — verify no proxy or load balancer silently strips the `X-Forwarded-Proto` header and downgrades to HTTP
@@ -391,7 +392,6 @@ On a personal repo, only you and collaborators you invited can merge. Anyone els
 - [ ] **Settings → Collaborators:** keep it empty, or only people you'd trust with merge rights.
 - [ ] **Settings → Actions → General → "Require approval for all external contributors"**, so a stranger's PR can't run workflows until you click approve.
 - [ ] **Never use `pull_request_target` or `workflow_run`** to build or test PR code. They run fork code with your secrets and a write token. Plain `on: pull_request` from a fork only gets a read-only token.
-- [ ] **Dependabot auto-merge:** gate on `github.event.pull_request.user.login == 'dependabot[bot]'`, not `github.actor`. The actor is whoever triggered the run, not whoever wrote the PR.
 - [ ] **Settings → Actions → General → leave "Allow GitHub Actions to create and approve pull requests" off.**
 
 ### Every pull request pipeline must run
