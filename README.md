@@ -103,6 +103,10 @@ ESLint does not read your stylesheets — nothing lints CSS/SCSS until you add S
   - **Leave `:active` alone.** It clears on `touchend` and is the correct press feedback on mobile; only `:hover` is sticky.
   - Hybrid devices (a touchscreen laptop with a mouse) report `hover: hover` + `pointer: fine` for their primary pointer, so they keep the full desktop treatment. Use `any-hover`/`any-pointer` only if you deliberately want a hover style on a device that *also* has a coarse pointer.
   - **Gate it so it can't creep back in.** No built-in Stylelint rule can express this — `selector-disallowed-list` sees the selector text but not the `@media` it sits in — so it takes a small local plugin: walk every rule whose selector contains `:hover`, walk up `node.parent`, and report unless an ancestor `@media` matches `/\bhover\s*:\s*hover\b/`. See [Stylelint](#stylelint).
+- [ ] **Nothing a player has to see or tap is smaller than 44 × 44 CSS pixels.** Older players use these apps, and on a phone anything smaller is hard to read and easy to miss with a thumb. 44 px is the WCAG 2.5.5 touch-target size; apply it to buttons and icons, and also to things that are only *looked at*, like the tiles of a game board.
+  - **An icon can stay smaller than its hit area.** Draw it at e.g. 40 px and give it an invisible 44 × 44 hit area (padding, or an inset `::before`) so the layout doesn't grow.
+  - **When content no longer fits a phone, scroll or follow, don't shrink.** A game board that must keep 44 px tiles may be bigger than the screen: let it scroll, or add a camera that follows the player, rather than scaling below the minimum to fit.
+  - **Scaled pixel art rounds up, not down.** A crisp scale covers a whole number of device pixels per art pixel, so the smallest crisp scale at or above 44 px is the floor (e.g. 16 px art becomes 48 px), never the largest one below it.
 
 ### Testing
 
