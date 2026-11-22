@@ -19,6 +19,10 @@ spaced-repetition plugin, so a note is written to be *recalled*, not just read.
 1. **Find the note it belongs in before creating one.** Search the vault for the topic
    (`grep -il` over `*.md`) and read the candidate note's headings. Extending an existing note's
    section beats a new file; a new section in an existing note beats a new note.
+   - **TypeScript goes in the Angular notes**, not `TypeScript.md`: the user learns TypeScript
+     through Angular and wants one set of notes, not two. Use the earliest Angular chapter it fits
+     (language basics → `Angular Basics.md`, section "TypeScript coming from Java"). Leave the
+     existing cards in `TypeScript.md` where they are unless asked to move them.
 2. **Show the draft first.** Present the exact text and where it would go, and wait for approval.
    Never write to the vault unasked.
 3. **Write it where you proposed**, matching the note's existing style, and say which section it
